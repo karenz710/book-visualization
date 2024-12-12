@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Visualization</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>Book Visualization</h1>
+    <form id="searchForm">
+        <input type="text" id="bookTitle" placeholder="Enter book title" required>
+        <button type="submit">Search</button>
+    </form>
+    <button onclick="clearGraph()">Clear Graph & Database</button>
+    <div id="bookChart"></div>
+    <script src="app.js"></script>
+</body>
+</html>

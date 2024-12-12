@@ -1,8 +1,37 @@
 from flask import Flask, request, jsonify
 import requests
 import mwparserfromhell
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from flask_cors import CORS
+import os
+from dotenv import load_dotenv
+import re
 
 app = Flask(__name__)
+CORS(app)
+
+# Load environment variables from .env file
+load_dotenv()
+
+# SQLite database configuration
+DATABASE_URI = 'sqlite:///books.db'
+engine = create_engine(DATABASE_URI)
+Base = declarative_base()
+
+class Book(Base):
+    __tablename__ = 'books'
+    id = Column(Integer, primary_key=True)
+    title = Column(String)
+    author = Column(String)
+    publication_place = Column(String)
+    publication_date = Column(String)
+    genre = Column(String)
+
+Base.metadata.create_all(engine)
+Session = sessionmaker(bind=engine)
+session = Session()
 
 def get_page_id(title):
     query = f"{title} book"
@@ -36,12 +65,19 @@ def get_infobox_content(page_id):
             'title': infobox.get('name').value.strip_code().strip() if infobox.has('name') else None,
             'author': infobox.get('author').value.strip_code().strip() if infobox.has('author') else None,
             'publication_place': infobox.get('country').value.strip_code().strip() if infobox.has('country') else None,
-            'publication_date': infobox.get('release_date').value.strip_code().strip() if infobox.has('release_date') else None,
+            'publication_date': extract_first_year(infobox.get('release_date').value.strip_code().strip()) if infobox.has('release_date') else None,
             'genre': infobox.get('genre').value.strip_code().strip() if infobox.has('genre') else None,
         }
         return infobox_data
     else:
         return None
+
+def extract_first_year(date_string):
+    # Find the first four-digit number in the string
+    match = re.search(r'\b\d{4}\b', date_string)
+    if match:
+        return match.group(0)
+    return None
 
 @app.route('/')
 def home():
@@ -57,11 +93,32 @@ def search():
     if page_id:
         infobox_data = get_infobox_content(page_id)
         if infobox_data:
+            new_book = Book(**infobox_data)
+            session.add(new_book)
+            session.commit()
             return jsonify(infobox_data), 200
         else:
             return jsonify({'error': 'Infobox not found'}), 404
     else:
         return jsonify({'error': 'Page ID not found'}), 404
+
+@app.route('/visualize', methods=['GET'])
+def visualize():
+    books = session.query(Book).all()
+    data = [{
+        'title': book.title,
+        'author': book.author,
+        'publication_date': book.publication_date,
+        'publication_place': book.publication_place
+    } for book in books]
+    return jsonify(data)
+
+@app.route('/clear', methods=['POST'])
+def clear_database():
+    session.query(Book).delete()
+    session.commit()
+    return jsonify({'message': 'Database cleared'}), 200
+
 
 if __name__ == '__main__':
     app.run(debug=True)
